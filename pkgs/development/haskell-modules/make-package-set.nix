@@ -68,7 +68,35 @@ let
     }));
   };
 
+
+  mkDerivationImplSpecial = pkgs.callPackage ./generic-builder-special.nix {
+    inherit stdenv;
+    nodejs = buildPackages.nodejs-slim;
+    inherit (self) buildHaskellPackages ghc ghcWithHoogle ghcWithPackages;
+    inherit (self.buildHaskellPackages) jailbreak-cabal;
+    hscolour = overrideCabal (drv: {
+      isLibrary = false;
+      doHaddock = false;
+      hyperlinkSource = false;      # Avoid depending on hscolour for this build.
+      postFixup = "rm -rf $out/lib $out/share $out/nix-support";
+    }) self.buildHaskellPackages.hscolour;
+    cpphs = overrideCabal (drv: {
+        isLibrary = false;
+        postFixup = "rm -rf $out/lib $out/share $out/nix-support";
+    }) (self.cpphs.overrideScope (self: super: {
+      mkDerivation = drv: super.mkDerivation (drv // {
+        enableSharedExecutables = false;
+        enableSharedLibraries = false;
+        doHaddock = false;
+        useCpphs = false;
+      });
+    }));
+  };
+
+
   mkDerivation = makeOverridable mkDerivationImpl;
+
+  mkDerivationSpecial = makeOverridable mkDerivationImplSpecial;
 
   # manualArgs are the arguments that were explictly passed to `callPackage`, like:
   #
@@ -170,7 +198,7 @@ let
 
 in package-set { inherit pkgs lib callPackage; } self // {
 
-    inherit mkDerivation callPackage haskellSrc2nix hackage2nix buildHaskellPackages;
+    inherit mkDerivation mkDerivationSpecial callPackage haskellSrc2nix hackage2nix buildHaskellPackages;
 
     inherit (haskellLib) packageSourceOverrides;
 
